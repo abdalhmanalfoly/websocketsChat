@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta charset="utf-8">
+    <link rel="icon" type="image/png" href="https://th.bing.com/th/id/OIP.l87dSKRLMxHCLlRQeSCntQHaHa?rs=1&pid=ImgDetMain">
+    <title>Chat with me</title>
+
+    <style>
+      body { margin: 0; padding-bottom: 3rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; display: flex; height: 3rem; box-sizing: border-box; backdrop-filter: blur(10px); }
+      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+      #input:focus { outline: none; }
+      #form > button { background: #393cfa; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }
+      #messages { list-style-type: none; margin: 0; padding: 0; }
+      #messages > li { padding: 0.5rem 1rem; }
+      #messages > li:nth-child(odd) { background: #efefef; }
+      #typing-indicator {
+    font-size: 1.1rem;
+    color: rgb(92, 91, 91);
+    margin-left: 20px;
+    align-self: center;
+}
+#header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: white; 
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+    padding: 10px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); 
+    z-index: 1000; 
+}
+body {
+    margin-top: 80px; 
+}
+
+    </style>
+  </head>
+  <body>
+    <p id="header">Made with 🐞, welcom in server </p>
+
+    <ul id="messages"></ul>
+    <form id="form">
+        <input id="input" autocomplete="off" />
+        <span id="typing-indicator"></span>
+        <button>Send</button>
+    </form>    
+
+    <!-- Socket.io client library -->
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+const socket = io("http://localhost:7000");
+const messages = document.getElementById("messages");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const typingIndicator = document.getElementById("typing-indicator");
+let typingTimeout;
+
+input.addEventListener("input", () => {
+    socket.emit("typing");
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        socket.emit("stopTyping");
+    }, 1000);
+});
+
+socket.on("typing", () => {
+    typingIndicator.textContent = "Usertyping...";
+});
+
+socket.on("stopTyping", () => {
+    typingIndicator.textContent = "";
+});
+
+let userId = localStorage.getItem("chatUserId");
+if (!userId) {
+    userId = `user_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem("chatUserId", userId);
+}
+
+window.onload = () => {
+    socket.emit("user connected", userId);
+    socket.on("load messages", (messagesArray) => {
+        messagesArray.forEach((msg) => {
+            displayMessage(msg._id, msg.text, msg.seenBy.length);
+            if (!msg.seenBy.includes(userId)) {
+                markMessageAsSeen(msg._id);
+            }
+        });
+    });
+};
+
+form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (input.value.trim()) {
+        socket.emit("chat message", input.value);
+        input.value = "";
+    }
+});
+
+socket.on("message", (msg) => {
+    displayMessage(msg._id, msg.text, msg.seenBy.length);
+    markMessageAsSeen(msg._id);
+});
+
+function markMessageAsSeen(messageId) {
+    const item = document.querySelector(`#messages li[data-id="${messageId}"]`);
+    if (item && !item.dataset.seen) {
+        let currentCount = parseInt(item.dataset.count || "0") +0;
+        item.textContent = item.textContent.split(" ✅")[0] + ` ✅ ${currentCount}`;
+        item.dataset.seen = "true";
+        item.dataset.count = currentCount;
+
+        socket.emit("message seen", { messageId, userId });
+    }
+}
+
+socket.on("message seen", (data) => {
+    const item = document.querySelector(`#messages li[data-id="${data.messageId}"]`);
+    if (item) {
+        item.textContent = item.textContent.split(" ✅")[0] + ` ✅ ${data.count}`;
+        item.dataset.count = data.count;
+    }
+});
+
+function displayMessage(id,  text, seenCount) {
+    const shortId = "gest_" + id.slice(6, 10); 
+    const item = document.createElement("li");
+    item.textContent = `${shortId}  `+" : " + text + " : " +(seenCount > 0 ? ` ✅ ${seenCount}` : "");
+    item.setAttribute("data-id", id);
+    item.dataset.count = seenCount;
+    messages.appendChild(item);
+    window.scrollTo(0, document.body.scrollHeight);
+}
+    </script>
+  </body>
+</html>
