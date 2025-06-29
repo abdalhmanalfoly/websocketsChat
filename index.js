@@ -15,7 +15,7 @@ const io = new Server(server, {
     }
 });
 
-mongoose.connect('mongodb+srv://abdalrhman:nodejs_123@mongodbdata.pnv50.mongodb.net/chat?retryWrites=true&w=majority&appName=mongodbdata', {
+mongoose.connect('dbhere', {
     useNewUrlParser: true,
     useUnifiedTopology: true
 }).then(() => console.log("✅ Database connected successfully"))
